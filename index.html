@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Recorte de Crachá em PDF</title>
+  <title>Extrair Crachás e Gerar PDF</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -25,70 +25,118 @@
       max-width: 420px;
       text-align: center;
     }
-    .badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1em;
-      justify-content: center;
-      margin-top: 1.5em;
+    #downloadBtn {
+      margin-top: 2em;
+      display: none;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      padding: 0.7em 2em;
+      border-radius: 6px;
+      font-size: 1em;
+      cursor: pointer;
+      transition: background 0.2s;
     }
-    .badges img {
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      background: #fafafa;
-      width: 64px;
-      height: 64px;
-      object-fit: cover;
+    #downloadBtn:hover {
+      background: #0056b3;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Recorte do Crachá do PDF</h1>
-    <p>Selecione arquivos PDF. O crachá da página será exibido abaixo.</p>
+    <h1>Gerar PDF de Crachás</h1>
+    <p>Selecione arquivos PDF. O PDF final poderá ser baixado.</p>
     <input type="file" id="fileUpload" accept=".pdf,application/pdf" multiple>
-    <div class="badges" id="badges"></div>
+    <button id="downloadBtn">Baixar PDF de Crachás</button>
+    <div id="status"></div>
   </div>
   <!-- PDF.js CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
+  <!-- jsPDF CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
     const input = document.getElementById('fileUpload');
-    const badges = document.getElementById('badges');
-
+    const downloadBtn = document.getElementById('downloadBtn');
+    const statusDiv = document.getElementById('status');
+    let badgeImages = [];
     input.addEventListener('change', async function () {
-      badges.innerHTML = '';
+      badgeImages = [];
+      statusDiv.textContent = "Processando arquivos...";
+      downloadBtn.style.display = "none";
       for (const file of input.files) {
+        await processPDF(file);
+      }
+      if (badgeImages.length > 0) {
+        statusDiv.textContent = `Total de crachás extraídos: ${badgeImages.length}`;
+        downloadBtn.style.display = "inline-block";
+      } else {
+        statusDiv.textContent = "Nenhum crachá extraído.";
+      }
+    });
+    async function processPDF(file) {
+      return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = async function (e) {
-          const typedarray = new Uint8Array(e.target.result);
-          const pdf = await pdfjsLib.getDocument(typedarray).promise;
-          const page = await pdf.getPage(1);
-
-          // Renderiza página em um canvas
-          const viewport = page.getViewport({ scale: 2 }); // Aumenta resolução
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-
-          await page.render({ canvasContext: context, viewport }).promise;
-
-          // Recorta a área do crachá (ajuste x, y, w, h conforme necessário)
-          // Exemplo: recorte de 0,0 até 64x64 pixels no canto superior esquerdo
-          const badgeCanvas = document.createElement('canvas');
-          const badgeSize = 64; // pixels
-          badgeCanvas.width = badgeSize;
-          badgeCanvas.height = badgeSize;
-          const badgeCtx = badgeCanvas.getContext('2d');
-          badgeCtx.drawImage(canvas, 0, 0, badgeSize, badgeSize, 0, 0, badgeSize, badgeSize);
-
-          // Exibe imagem recortada
-          const img = document.createElement('img');
-          img.src = badgeCanvas.toDataURL();
-          badges.appendChild(img);
+          try {
+            const typedarray = new Uint8Array(e.target.result);
+            const pdf = await pdfjsLib.getDocument(typedarray).promise;
+            const page = await pdf.getPage(1);
+            const viewport = page.getViewport({ scale: 2 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: context, viewport }).promise;
+            const badgeCanvas = document.createElement('canvas');
+            const badgeSize = 64;
+            badgeCanvas.width = badgeSize;
+            badgeCanvas.height = badgeSize;
+            const badgeCtx = badgeCanvas.getContext('2d');
+            badgeCtx.drawImage(canvas, 0, 0, badgeSize, badgeSize, 0, 0, badgeSize, badgeSize);
+            badgeImages.push(badgeCanvas.toDataURL());
+          } catch (err) {
+            console.error("Erro ao processar PDF", err);
+          }
+          resolve();
         };
         reader.readAsArrayBuffer(file);
-      }
+      });
+    }
+    downloadBtn.addEventListener('click', function () {
+      statusDiv.textContent = "Gerando PDF...";
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: "a4"
+      });
+      const badgeWidth = 64;
+      const badgeHeight = 64;
+      const marginX = 40;
+      const marginY = 40;
+      const verticalSpacing = 20;
+      const colCount = 2;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let x = marginX, y = marginY;
+      let col = 0;
+      badgeImages.forEach((img, idx) => {
+        pdf.addImage(img, "PNG", x, y, badgeWidth, badgeHeight);
+        col++;
+        if (col < colCount) {
+          x += badgeWidth + marginX;
+        } else {
+          col = 0;
+          x = marginX;
+          y += badgeHeight + verticalSpacing;
+          if (y + badgeHeight + marginY > pageHeight) {
+            pdf.addPage();
+            y = marginY;
+          }
+        }
+      });
+      pdf.save("crachas.pdf");
+      statusDiv.textContent = "PDF gerado com sucesso!";
     });
   </script>
 </body>
