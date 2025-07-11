@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Upload de Arquivos PDF/PNG/JPEG</title>
+  <title>Upload de Arquivos PDF</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -73,14 +73,14 @@
 </head>
 <body>
   <div class="container">
-    <h1>Upload de Arquivos</h1>
-    <p>Selecione múltiplos arquivos <b>PDF</b>, <b>PNG</b> ou <b>JPEG</b>.</p>
+    <h1>Upload de Arquivos PDF</h1>
+    <p>Selecione um ou mais arquivos <b>PDF</b> para enviar.</p>
     <div class="file-input">
       <label for="fileUpload">Escolher arquivos</label>
       <input 
         type="file" 
         id="fileUpload" 
-        accept=".pdf,image/png,image/jpeg"
+        accept=".pdf,application/pdf"
         multiple
       />
       <ul id="fileList" class="file-list"></ul>
