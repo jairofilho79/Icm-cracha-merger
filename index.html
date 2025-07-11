@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Upload de Arquivos PDF</title>
+  <title>Recorte de Crachá em PDF</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       background: #f8f9fa;
       color: #333;
+      min-height: 100vh;
       margin: 0;
       padding: 0;
       display: flex;
-      min-height: 100vh;
       align-items: center;
       justify-content: center;
     }
@@ -23,79 +23,71 @@
       box-shadow: 0 4px 24px rgba(0,0,0,0.07);
       min-width: 320px;
       max-width: 420px;
-    }
-    h1 {
-      font-size: 1.4em;
-      margin-bottom: 0.5em;
-      text-align: center;
-      font-weight: 600;
-    }
-    p {
-      font-size: 1em;
-      margin-bottom: 1.5em;
-      text-align: center;
-      color: #666;
-    }
-    .file-input {
-      width: 100%;
-      padding: 1em 0;
       text-align: center;
     }
-    input[type="file"] {
-      display: none;
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1em;
+      justify-content: center;
+      margin-top: 1.5em;
     }
-    label {
-      display: inline-block;
-      background: #007bff;
-      color: #fff;
-      padding: 0.6em 2em;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 1em;
-      transition: background 0.2s;
-    }
-    label:hover {
-      background: #0056b3;
-    }
-    .file-list {
-      margin-top: 1em;
-      font-size: 0.97em;
-      color: #444;
-      list-style: none;
-      padding: 0;
-    }
-    .file-list li {
-      padding: 0.3em 0;
-      border-bottom: 1px solid #ebebeb;
-      word-break: break-all;
+    .badges img {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #fafafa;
+      width: 64px;
+      height: 64px;
+      object-fit: cover;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Upload de Arquivos PDF</h1>
-    <p>Selecione um ou mais arquivos <b>PDF</b> para enviar.</p>
-    <div class="file-input">
-      <label for="fileUpload">Escolher arquivos</label>
-      <input 
-        type="file" 
-        id="fileUpload" 
-        accept=".pdf,application/pdf"
-        multiple
-      />
-      <ul id="fileList" class="file-list"></ul>
-    </div>
+    <h1>Recorte do Crachá do PDF</h1>
+    <p>Selecione arquivos PDF. O crachá da página será exibido abaixo.</p>
+    <input type="file" id="fileUpload" accept=".pdf,application/pdf" multiple>
+    <div class="badges" id="badges"></div>
   </div>
+  <!-- PDF.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
   <script>
     const input = document.getElementById('fileUpload');
-    const fileList = document.getElementById('fileList');
+    const badges = document.getElementById('badges');
 
-    input.addEventListener('change', function() {
-      fileList.innerHTML = '';
+    input.addEventListener('change', async function () {
+      badges.innerHTML = '';
       for (const file of input.files) {
-        const li = document.createElement('li');
-        li.textContent = `${file.name} (${Math.round(file.size/1024)} KB)`;
-        fileList.appendChild(li);
+        const reader = new FileReader();
+        reader.onload = async function (e) {
+          const typedarray = new Uint8Array(e.target.result);
+          const pdf = await pdfjsLib.getDocument(typedarray).promise;
+          const page = await pdf.getPage(1);
+
+          // Renderiza página em um canvas
+          const viewport = page.getViewport({ scale: 2 }); // Aumenta resolução
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+
+          await page.render({ canvasContext: context, viewport }).promise;
+
+          // Recorta a área do crachá (ajuste x, y, w, h conforme necessário)
+          // Exemplo: recorte de 0,0 até 64x64 pixels no canto superior esquerdo
+          const badgeCanvas = document.createElement('canvas');
+          const badgeSize = 64; // pixels
+          badgeCanvas.width = badgeSize;
+          badgeCanvas.height = badgeSize;
+          const badgeCtx = badgeCanvas.getContext('2d');
+          badgeCtx.drawImage(canvas, 0, 0, badgeSize, badgeSize, 0, 0, badgeSize, badgeSize);
+
+          // Exibe imagem recortada
+          const img = document.createElement('img');
+          img.src = badgeCanvas.toDataURL();
+          badges.appendChild(img);
+        };
+        reader.readAsArrayBuffer(file);
       }
     });
   </script>
